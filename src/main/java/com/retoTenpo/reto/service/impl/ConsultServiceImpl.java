@@ -1,0 +1,162 @@
+package com.retoTenpo.reto.service.impl;
+
+import com.retoTenpo.reto.controller.request.ValuesRequest;
+import com.retoTenpo.reto.controller.response.HistoryResponse;
+import com.retoTenpo.reto.controller.response.ValuesResponse;
+import com.retoTenpo.reto.repository.SessionTemplateRepository;
+import com.retoTenpo.reto.repository.model.History;
+import com.retoTenpo.reto.repository.HistoryRepository;
+import com.retoTenpo.reto.repository.model.Session;
+import com.retoTenpo.reto.service.ConsultService;
+import com.retoTenpo.reto.webclient.ExternalApiWebClient;
+import com.retoTenpo.reto.webclient.util.JsonConvert;
+import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
+import reactor.core.scheduler.Schedulers;
+
+@Service
+@Slf4j
+@RequiredArgsConstructor
+@Validated
+public class ConsultServiceImpl implements ConsultService {
+
+  private final HistoryRepository historyRepository;
+
+  private final ExternalApiWebClient externalApiWebClient;
+
+  private final SessionTemplateRepository sessionTemplateRepository;
+
+  @Override
+  public Mono<ValuesResponse> calculateSum(ValuesRequest request, ServerWebExchange httpRequest) {
+    BigDecimal num1 = request.getNum1();
+    BigDecimal num2 = request.getNum2();
+
+    if (num1 == null || num2 == null) {
+      String error = "num1 o num2 no pueden ser null";
+
+      History errorHistory = ConsultServiceBuild.buildCommonHistory(num1, num2,httpRequest.getRequest().getMethod().toString(), httpRequest)
+          .status("ERROR")
+          .answer(null)
+          .errorMessage(error)
+          .build();
+
+      return Mono.fromCallable(() -> historyRepository.save(errorHistory))
+          .thenReturn(ValuesResponse.builder()
+              .answer(null)
+              .build());
+    }
+
+    // Si ambos están presentes, continuar con la suma y validaciones normales
+    BigDecimal result = num1.add(num2);
+
+    // Validación por límites de numeric(38,2)
+    String plainString = result.stripTrailingZeros().toPlainString();
+    int digitsBeforeDecimal = plainString.contains(".") ? plainString.indexOf(".") : plainString.length();
+    int digitsAfterDecimal = plainString.contains(".") ? plainString.length() - plainString.indexOf(".") - 1 : 0;
+
+    if (digitsBeforeDecimal + digitsAfterDecimal > 38 || digitsAfterDecimal > 2) {
+      String error = "El resultado excede el límite de numeric(38, 2)";
+      History errorHistory = ConsultServiceBuild.buildCommonHistory(num1, num2,httpRequest.getRequest().getMethod().toString(), httpRequest)
+          .answer(null)
+          .status("ERROR")
+          .errorMessage(error)
+          .build();
+
+      return Mono.fromCallable(() -> historyRepository.save(errorHistory))
+          .thenReturn(ValuesResponse.builder()
+              .answer(null)
+              .build());
+    }
+
+    // Todo OK, guardar con status OK
+    History history = ConsultServiceBuild.buildCommonHistory(num1, num2, httpRequest.getRequest().getMethod().toString(), httpRequest)
+        .answer(result)
+        .status("OK")
+        .build();
+
+    UUID uuid = createUuidIdentifier(num1.toString(), num2.toString());
+
+    return handleNewSession(history, num1.toString(), num2.toString(), uuid);
+  }
+
+  private Mono<ValuesResponse> handleNewSession(History history, String num1, String num2, UUID uuid) {
+    BigDecimal originalAnswer = history.getAnswer();
+    return externalApiWebClient.getPercentage().flatMap(externalApiResponse -> {
+
+      BigDecimal percentage = externalApiResponse.getRandom();
+
+      // Calcular incremento: answer * percentage / 100
+      BigDecimal increment = originalAnswer.multiply(percentage).divide(BigDecimal.valueOf(100));
+      BigDecimal newAnswer = originalAnswer.add(increment);
+
+      history.setAnswer(newAnswer); // Asignar nuevo valor
+
+      UUID uuidSession = createUuidIdentifier(num1, num2);
+
+      // 🔄 Guardado asíncrono en segundo plano con delay
+      Mono.fromCallable(() -> historyRepository.save(history))
+          .subscribeOn(Schedulers.boundedElastic())
+          .delaySubscription(Duration.ofSeconds(20))
+          .doOnSubscribe(sub -> log.info("📌 Iniciando registro de historial con retraso..."))
+          .doOnSuccess(h -> log.info("✅ Historial registrado exitosamente"))
+          .doOnError(e -> log.error("❌ Error al registrar historial: {}", e.getMessage()))
+          .subscribe();
+
+      // ✅ Solo espera la sesión
+      return sessionTemplateRepository.saveSesion(Session.builder()
+              .guuid(uuidSession)
+              .percentage(percentage)
+              .build())
+          .map(sess -> ValuesResponse.builder()
+              .answer(newAnswer)
+              .build()
+          );
+    }).onErrorResume(e -> {
+      log.warn("⚠️ Falló externalApiWebClient.getPercentage(): {}. Recuperando desde Redis...", e.getMessage());
+      return sessionTemplateRepository.findSesionByGuuid(uuid)
+          .flatMap(fallbackSession -> {
+            log.info("Initial session: {}", JsonConvert.serializeObject(fallbackSession));
+            if (fallbackSession.getGuuid() == null) {
+              return Mono.error(new RuntimeException("No se encontró sesión válida en Redis"));
+            }
+            // Calcular incremento: answer * percentage / 100
+            BigDecimal increment = originalAnswer.multiply(fallbackSession.getPercentage()).divide(BigDecimal.valueOf(100));
+            BigDecimal newAnswer = originalAnswer.add(increment);
+
+            history.setAnswer(newAnswer); // Asignar nuevo valor
+
+            // 🔄 Guardado asíncrono en segundo plano con delay
+            Mono.fromCallable(() -> historyRepository.save(history))
+                .subscribeOn(Schedulers.boundedElastic())
+                .delaySubscription(Duration.ofSeconds(20))
+                .doOnSubscribe(sub -> log.info("📌 Iniciando registro de historial con retraso..."))
+                .doOnSuccess(h -> log.info("✅ Historial registrado exitosamente"))
+                .doOnError(ex -> log.error("❌ Error al registrar historial: {}", ex.getMessage()))
+                .subscribe();
+
+            return Mono.just(ValuesResponse.builder()
+                .answer(newAnswer)
+                .build());
+          });
+    });
+  }
+
+  private UUID createUuidIdentifier(String num1, String num2) {
+    String concatenatedString = num1 + num2;
+    return UUID.nameUUIDFromBytes(concatenatedString.getBytes(StandardCharsets.UTF_8));
+  }
+
+  @Override
+  public Mono<HistoryResponse> getHistory() {
+    return null;
+  }
+}
