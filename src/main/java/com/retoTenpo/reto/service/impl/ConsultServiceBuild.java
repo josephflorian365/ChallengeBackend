@@ -14,7 +14,7 @@ public class ConsultServiceBuild {
   public static History.HistoryBuilder buildCommonHistory(BigDecimal num1, BigDecimal num2, String endpoint, ServerWebExchange httpRequest) {
     return History.builder()
         .endPoint(httpRequest.getRequest().getURI().getPath())
-        .date(LocalDateTime.now()) // Usás LocalDateTime en lugar de LocalDate si querés incluir hora
+        .date(LocalDateTime.now())
         .method(endpoint)
         .parameters(toJson(num1,num2));
   }

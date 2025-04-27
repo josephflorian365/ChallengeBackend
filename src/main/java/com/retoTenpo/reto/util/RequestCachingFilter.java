@@ -25,17 +25,17 @@ public class RequestCachingFilter implements WebFilter {
           dataBuffer.read(bytes);
           DataBufferUtils.release(dataBuffer);
 
-          // Guarda el body en atributos del exchange
+          // Store the body in the exchange attributes
           String requestBody = new String(bytes, StandardCharsets.UTF_8);
           exchange.getAttributes().put("requestBody", requestBody);
 
-          // Clona el body en un nuevo DataBuffer
+          // Clone the body into a new DataBuffer
           Flux<DataBuffer> cachedBody = Flux.defer(() -> {
             DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(bytes);
             return Mono.just(buffer);
           });
 
-          // Crea una nueva request que usa el body clonado
+          // Create a new request that uses the cloned body
           ServerHttpRequest mutatedRequest = new ServerHttpRequestDecorator(request) {
             @Override
             public Flux<DataBuffer> getBody() {

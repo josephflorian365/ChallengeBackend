@@ -6,21 +6,29 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import com.retoTenpo.reto.controller.request.ValuesRequest;
+import com.retoTenpo.reto.controller.response.HistoryResponse;
+import com.retoTenpo.reto.controller.response.PagedResponse;
 import com.retoTenpo.reto.controller.response.ValuesResponse;
 import com.retoTenpo.reto.repository.HistoryRepository;
 import com.retoTenpo.reto.repository.SessionTemplateRepository;
+import com.retoTenpo.reto.repository.model.History;
 import com.retoTenpo.reto.repository.model.Session;
 import com.retoTenpo.reto.webclient.ExternalApiWebClient;
 import com.retoTenpo.reto.webclient.response.ExternalApiResponse;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URI;
+import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.server.reactive.ServerHttpRequest;
 import org.springframework.web.server.ServerWebExchange;
@@ -99,6 +107,35 @@ class ConsultServiceImplTest {
   }
 
   @Test
-  void getHistory() {
+  void givenDataBase_whenGetHistory_thenReturnPageResponse() {
+    // Arrange (Given)
+    PageRequest pageRequest = PageRequest.of(0, 10);
+
+    History mockHistory = History.builder()
+        .answer(BigDecimal.TEN)
+        .parameters("params")
+        .endPoint("/test")
+        .date(LocalDateTime.now())
+        .errorMessage(null)
+        .build();
+    List<History> historyList = List.of(mockHistory);
+
+    Page<History> mockPage = new PageImpl<>(historyList, pageRequest, historyList.size());
+
+    when(historyRepository.findAll(pageRequest)).thenReturn(mockPage);
+
+    // Act (When)
+    Mono<PagedResponse<HistoryResponse>> result = consultService.getHistory(pageRequest);
+
+    // Assert (Then)
+    StepVerifier.create(result)
+        .assertNext(response -> {
+          assertEquals(1, response.getContent().size());
+          assertEquals(1, response.getTotalElements());
+          assertEquals(1, response.getTotalPages());
+          assertEquals(1, response.getPage()); // 0 (base) + 1
+          assertEquals(10, response.getSize());
+        })
+        .verifyComplete();
   }
 }

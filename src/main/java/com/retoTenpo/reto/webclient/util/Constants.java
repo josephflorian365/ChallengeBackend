@@ -1,9 +1,8 @@
 package com.retoTenpo.reto.webclient.util;
 
-import lombok.AccessLevel;
-import lombok.NoArgsConstructor;
+import lombok.experimental.UtilityClass;
 
-@NoArgsConstructor(access = AccessLevel.PRIVATE)
+@UtilityClass
 public class Constants {
   public static final String ERROR_SERIALIZE_OBJECT = "No json";
 }

@@ -4,6 +4,7 @@ import com.retoTenpo.reto.controller.response.ErrorResponse;
 import com.retoTenpo.reto.repository.HistoryRepository;
 import com.retoTenpo.reto.repository.model.History;
 import com.retoTenpo.reto.service.exception.InvalidAnswerException;
+import com.retoTenpo.reto.service.exception.SessionNotFoundException;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
@@ -33,29 +34,30 @@ public class GlobalExceptionHandler {
 
   @ExceptionHandler(Exception.class)
   public Mono<ResponseEntity<ErrorResponse>> handleGeneric(Exception ex) {
-    log.error("Excepción no capturada: " + ex.getClass().getName(), ex);
+    log.error("Uncaught exception: " + ex.getClass().getName(), ex);
     ErrorResponse error = new ErrorResponse("INTERNAL_SERVER_ERROR", "Ocurrió un error inesperado.");
     return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(error));
   }
 
   @ExceptionHandler(ServerWebInputException.class)
   public Mono<ResponseEntity<ErrorResponse>> handleServerWebInputException(ServerWebInputException ex) {
-    ex.printStackTrace(); // <-- esto va a mostrar que adentro hay un NPE
+    log.error("Exception ServerWebInputException: {}",ex.getMessage());
     ErrorResponse error = new ErrorResponse("BAD_REQUEST", "Entrada inválida: " + ex.getReason());
     return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error));
   }
 
   @ExceptionHandler(WebExchangeBindException.class)
   public Mono<ResponseEntity<ErrorResponse>> handleValidationException(WebExchangeBindException ex, ServerWebExchange exchange) {
-    log.info("Exception WebExchangeBindException {}",ex.getMessage());
+    log.info("Exception WebExchangeBindException: {}",ex.getMessage());
     String errorMessage = ex.getFieldErrors().stream()
         .map(err -> err.getField() + ": " + err.getDefaultMessage())
         .collect(Collectors.joining(", "));
 
     String path = exchange.getRequest().getPath().toString();
     String method = exchange.getRequest().getMethod().name();
-    String requestBody = (String) exchange.getAttributes().get("requestBody");
-    // Guardar en historial
+    String requestBody = (String) exchange.getAttributes().get("requestBody"); // if you have it previously set
+
+    // Save to history
     return Mono.fromCallable(() -> historyRepository.save(History.builder()
             .answer(null)
             .date(LocalDateTime.now())
@@ -83,9 +85,9 @@ public class GlobalExceptionHandler {
     String errorMessage = ex.getMessage();
     String path = exchange.getRequest().getPath().toString();
     String method = exchange.getRequest().getMethod().name();
-    String requestBody = (String) exchange.getAttributes().get("requestBody"); // si lo tienes seteado previamente
+    String requestBody = (String) exchange.getAttributes().get("requestBody"); // if you have it previously set
 
-    // Guardar en historial
+    // Save to history
     return Mono.fromCallable(() -> historyRepository.save(History.builder()
             .answer(null)
             .date(LocalDateTime.now())
@@ -102,6 +104,36 @@ public class GlobalExceptionHandler {
         .then(Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(
             ErrorResponse.builder()
                 .code("BAD_REQUEST")
+                .message(errorMessage)
+                .build()
+        )));
+  }
+
+  @ExceptionHandler(SessionNotFoundException.class)
+  public Mono<ResponseEntity<ErrorResponse>> handleInvalidAnswer(SessionNotFoundException ex, ServerWebExchange exchange) {
+    log.info("Exception SessionNotFoundException {}",ex.getMessage());
+    String errorMessage = ex.getMessage();
+    String path = exchange.getRequest().getPath().toString();
+    String method = exchange.getRequest().getMethod().name();
+    String requestBody = (String) exchange.getAttributes().get("requestBody"); // if you have it previously set
+
+    // Save to history
+    return Mono.fromCallable(() -> historyRepository.save(History.builder()
+            .answer(null)
+            .date(LocalDateTime.now())
+            .errorMessage(errorMessage)
+            .endPoint(path)
+            .method(method)
+            .parameters(requestBody)
+            .status("ERROR")
+            .build()))
+        .subscribeOn(Schedulers.boundedElastic())
+        .doOnSubscribe(sub -> log.info("📌 Starting delayed history registration..."))
+        .doOnSuccess(h -> log.info("✅ History registered successfully"))
+        .doOnError(throwable -> log.error("❌ Failed to register history: {}", throwable.getMessage()))
+        .then(Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body(
+            ErrorResponse.builder()
+                .code("NOT_FOUND")
                 .message(errorMessage)
                 .build()
         )));
