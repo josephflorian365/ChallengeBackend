@@ -1,0 +1,49 @@
+package com.retoTenpo.reto.util;
+
+import java.nio.charset.StandardCharsets;
+import org.springframework.core.io.buffer.DataBuffer;
+import org.springframework.core.io.buffer.DataBufferUtils;
+import org.springframework.http.server.reactive.ServerHttpRequest;
+import org.springframework.http.server.reactive.ServerHttpRequestDecorator;
+import org.springframework.stereotype.Component;
+import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+
+@Component
+public class RequestCachingFilter implements WebFilter {
+
+  @Override
+  public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
+    ServerHttpRequest request = exchange.getRequest();
+
+    return DataBufferUtils.join(request.getBody())
+        .flatMap(dataBuffer -> {
+          byte[] bytes = new byte[dataBuffer.readableByteCount()];
+          dataBuffer.read(bytes);
+          DataBufferUtils.release(dataBuffer);
+
+          // Guarda el body en atributos del exchange
+          String requestBody = new String(bytes, StandardCharsets.UTF_8);
+          exchange.getAttributes().put("requestBody", requestBody);
+
+          // Clona el body en un nuevo DataBuffer
+          Flux<DataBuffer> cachedBody = Flux.defer(() -> {
+            DataBuffer buffer = exchange.getResponse().bufferFactory().wrap(bytes);
+            return Mono.just(buffer);
+          });
+
+          // Crea una nueva request que usa el body clonado
+          ServerHttpRequest mutatedRequest = new ServerHttpRequestDecorator(request) {
+            @Override
+            public Flux<DataBuffer> getBody() {
+              return cachedBody;
+            }
+          };
+
+          return chain.filter(exchange.mutate().request(mutatedRequest).build());
+        });
+  }
+}

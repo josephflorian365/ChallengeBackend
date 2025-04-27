@@ -2,23 +2,25 @@ package com.retoTenpo.reto.service.impl;
 
 import com.retoTenpo.reto.controller.request.ValuesRequest;
 import com.retoTenpo.reto.controller.response.HistoryResponse;
+import com.retoTenpo.reto.controller.response.PagedResponse;
 import com.retoTenpo.reto.controller.response.ValuesResponse;
+import com.retoTenpo.reto.repository.HistoryRepository;
 import com.retoTenpo.reto.repository.SessionTemplateRepository;
 import com.retoTenpo.reto.repository.model.History;
-import com.retoTenpo.reto.repository.HistoryRepository;
 import com.retoTenpo.reto.repository.model.Session;
 import com.retoTenpo.reto.service.ConsultService;
+import com.retoTenpo.reto.service.exception.InvalidAnswerException;
 import com.retoTenpo.reto.webclient.ExternalApiWebClient;
 import com.retoTenpo.reto.webclient.util.JsonConvert;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.time.LocalDateTime;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
@@ -26,7 +28,6 @@ import reactor.core.scheduler.Schedulers;
 @Service
 @Slf4j
 @RequiredArgsConstructor
-@Validated
 public class ConsultServiceImpl implements ConsultService {
 
   private final HistoryRepository historyRepository;
@@ -37,23 +38,9 @@ public class ConsultServiceImpl implements ConsultService {
 
   @Override
   public Mono<ValuesResponse> calculateSum(ValuesRequest request, ServerWebExchange httpRequest) {
+    log.info("ingresando: {}",request);
     BigDecimal num1 = request.getNum1();
     BigDecimal num2 = request.getNum2();
-
-    if (num1 == null || num2 == null) {
-      String error = "num1 o num2 no pueden ser null";
-
-      History errorHistory = ConsultServiceBuild.buildCommonHistory(num1, num2,httpRequest.getRequest().getMethod().toString(), httpRequest)
-          .status("ERROR")
-          .answer(null)
-          .errorMessage(error)
-          .build();
-
-      return Mono.fromCallable(() -> historyRepository.save(errorHistory))
-          .thenReturn(ValuesResponse.builder()
-              .answer(null)
-              .build());
-    }
 
     // Si ambos están presentes, continuar con la suma y validaciones normales
     BigDecimal result = num1.add(num2);
@@ -64,17 +51,7 @@ public class ConsultServiceImpl implements ConsultService {
     int digitsAfterDecimal = plainString.contains(".") ? plainString.length() - plainString.indexOf(".") - 1 : 0;
 
     if (digitsBeforeDecimal + digitsAfterDecimal > 38 || digitsAfterDecimal > 2) {
-      String error = "El resultado excede el límite de numeric(38, 2)";
-      History errorHistory = ConsultServiceBuild.buildCommonHistory(num1, num2,httpRequest.getRequest().getMethod().toString(), httpRequest)
-          .answer(null)
-          .status("ERROR")
-          .errorMessage(error)
-          .build();
-
-      return Mono.fromCallable(() -> historyRepository.save(errorHistory))
-          .thenReturn(ValuesResponse.builder()
-              .answer(null)
-              .build());
+      throw new InvalidAnswerException("El resultado excede el límite de numeric(38, 2)");
     }
 
     // Todo OK, guardar con status OK
@@ -95,7 +72,7 @@ public class ConsultServiceImpl implements ConsultService {
       BigDecimal percentage = externalApiResponse.getRandom();
 
       // Calcular incremento: answer * percentage / 100
-      BigDecimal increment = originalAnswer.multiply(percentage).divide(BigDecimal.valueOf(100));
+      BigDecimal increment = originalAnswer.multiply(percentage).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
       BigDecimal newAnswer = originalAnswer.add(increment);
 
       history.setAnswer(newAnswer); // Asignar nuevo valor
@@ -129,7 +106,7 @@ public class ConsultServiceImpl implements ConsultService {
               return Mono.error(new RuntimeException("No se encontró sesión válida en Redis"));
             }
             // Calcular incremento: answer * percentage / 100
-            BigDecimal increment = originalAnswer.multiply(fallbackSession.getPercentage()).divide(BigDecimal.valueOf(100));
+            BigDecimal increment = originalAnswer.multiply(fallbackSession.getPercentage()).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
             BigDecimal newAnswer = originalAnswer.add(increment);
 
             history.setAnswer(newAnswer); // Asignar nuevo valor
@@ -138,9 +115,9 @@ public class ConsultServiceImpl implements ConsultService {
             Mono.fromCallable(() -> historyRepository.save(history))
                 .subscribeOn(Schedulers.boundedElastic())
                 .delaySubscription(Duration.ofSeconds(20))
-                .doOnSubscribe(sub -> log.info("📌 Iniciando registro de historial con retraso..."))
-                .doOnSuccess(h -> log.info("✅ Historial registrado exitosamente"))
-                .doOnError(ex -> log.error("❌ Error al registrar historial: {}", ex.getMessage()))
+                .doOnSubscribe(sub -> log.info("📌 Starting delayed history registration..."))
+                .doOnSuccess(h -> log.info("✅ History registered successfully"))
+                .doOnError(ex -> log.error("❌ Failed to register history: {}", ex.getMessage()))
                 .subscribe();
 
             return Mono.just(ValuesResponse.builder()
@@ -156,7 +133,25 @@ public class ConsultServiceImpl implements ConsultService {
   }
 
   @Override
-  public Mono<HistoryResponse> getHistory() {
-    return null;
+  public Mono<PagedResponse<HistoryResponse>> getHistory(PageRequest pageRequest) {
+    return Mono.fromCallable(() -> historyRepository.findAll(pageRequest))
+        .subscribeOn(Schedulers.boundedElastic())
+        .map(page -> new PagedResponse<>(
+            page.getContent().stream().map(this::mapToResponse).toList(),
+            pageRequest.getPageNumber() + 1,
+            pageRequest.getPageSize(),
+            page.getTotalElements(),
+            page.getTotalPages()
+        ));
+  }
+
+  private HistoryResponse mapToResponse(History history) {
+    return HistoryResponse.builder()
+        .date(history.getDate())
+        .endPoint(history.getEndPoint())
+        .parameters(history.getParameters())
+        .answer(history.getAnswer())
+        .error(history.getErrorMessage())
+        .build();
   }
 }

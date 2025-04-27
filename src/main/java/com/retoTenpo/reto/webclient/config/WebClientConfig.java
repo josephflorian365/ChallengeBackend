@@ -20,9 +20,6 @@ public class WebClientConfig {
 
   private final ExternalApiEnvironmentConfig externalApiEnvironmentConfig;
 
-/*  @Value("${api.support.base.external-api}")
-  private String externalApiEnvironmentConfig;*/
-
   @Value("${webclient.connect.time-out.millis}")
   private Integer webclientConnectTimeOut;
 

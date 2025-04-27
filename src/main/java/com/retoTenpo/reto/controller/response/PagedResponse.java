@@ -1,7 +1,6 @@
-package com.retoTenpo.reto.controller.request;
+package com.retoTenpo.reto.controller.response;
 
-import jakarta.validation.constraints.NotNull;
-import java.math.BigDecimal;
+import java.util.List;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -15,9 +14,10 @@ import lombok.ToString;
 @NoArgsConstructor
 @Setter
 @ToString
-public class ValuesRequest {
-  @NotNull
-  private BigDecimal num1;
-  @NotNull
-  private BigDecimal num2;
+public class PagedResponse<T> {
+  private List<T> content;
+  private int page;
+  private int size;
+  private long totalElements;
+  private int totalPages;
 }

@@ -1,6 +1,8 @@
 package com.retoTenpo.reto.controller.response;
 
-import java.time.LocalDate;
+import com.fasterxml.jackson.annotation.JsonInclude;
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -15,8 +17,10 @@ import lombok.ToString;
 @Setter
 @ToString
 public class HistoryResponse {
-  private LocalDate date;
+  private LocalDateTime date;
   private String endPoint;
   private String parameters;
-  private String answer;
+  private BigDecimal answer;
+  @JsonInclude(JsonInclude.Include.NON_NULL)
+  private String error;
 }
