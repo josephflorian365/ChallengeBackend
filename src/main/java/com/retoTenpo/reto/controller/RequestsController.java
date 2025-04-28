@@ -38,10 +38,10 @@ public class RequestsController {
 
   @GetMapping("/history")
   public Mono<PagedResponse<HistoryResponse>> getHistory(
-      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "1") int page,
       @RequestParam(defaultValue = "10") int size
   ) {
-    PageRequest pageRequest = PageRequest.of(page, size);
+    PageRequest pageRequest = PageRequest.of(page - 1, size);
     return consultService.getHistory(pageRequest);
   }
 }

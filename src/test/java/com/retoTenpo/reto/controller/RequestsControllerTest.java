@@ -84,7 +84,7 @@ class RequestsControllerTest {
     List<HistoryResponse> historyList = List.of(history1, history2);
     PagedResponse<HistoryResponse> pagedResponse = new PagedResponse<>();
     pagedResponse.setContent(historyList);
-    pagedResponse.setPage(0);
+    pagedResponse.setPage(1);
     pagedResponse.setSize(10);
     pagedResponse.setTotalElements(2);
 
@@ -94,12 +94,12 @@ class RequestsControllerTest {
 
     // Prueba del endpoint
     webTestClient.get()
-        .uri("/api/history?page=0&size=10")
+        .uri("/api/history?page=1&size=10")
         .exchange()
         .expectStatus().isOk()
         .expectBody()
         .jsonPath("$.content.length()").isEqualTo(2)
-        .jsonPath("$.page").isEqualTo(0)
+        .jsonPath("$.page").isEqualTo(1)
         .jsonPath("$.size").isEqualTo(10)
         .jsonPath("$.totalElements").isEqualTo(2)
         .jsonPath("$.content[0].endPoint").isEqualTo("/api/sum")
