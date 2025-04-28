@@ -74,7 +74,7 @@ docker-compose up --build -d
 
 | Método | Endpoint     | Descripción                                 |
 |--------|--------------|---------------------------------------------|
-| GET    | `/calculate` | Realiza suma con porcentaje dinámico        |
+| POST    | `/calculate` | Realiza suma con porcentaje dinámico        |
 | GET    | `/history`   | Devuelve historial de llamadas (paginado)   |
 
 ---
