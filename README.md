@@ -74,14 +74,48 @@ docker-compose up -d
 
 | Método | Endpoint     | Descripción                                 |
 |--------|--------------|---------------------------------------------|
-| POST    | `/calculate` | Realiza suma con porcentaje dinámico        |
+| POST    | `/sum` | Realiza suma con porcentaje dinámico        |
 | GET    | `/history`   | Devuelve historial de llamadas (paginado)   |
 
 ---
+
+## 📌 Ejemplos de Uso
+
+### 🟢 POST `/sum`
+
+Realiza una suma entre dos números y aplica un porcentaje adicional.
+
+- **URL:** `http://localhost:8080/api/sum`
+- **Método:** `POST`
+- **Query param (opcional):** `mockEnabled=true`
+- **Request Body:**
+
+```json
+{
+  "num1": 10,
+  "num2": 5
+}
+```
+### 🔵 GET `/history`
+
+Devuelve el historial de llamadas realizadas al endpoint `/sum`, con soporte para paginación.
+
+- **URL base:** `http://localhost:8080/api/history`
+- **Método:** `GET`
+- **Parámetros de consulta (query params):**
+  - `page` (int): Número de página (por defecto: `1`)
+  - `size` (int): Cantidad de resultados por página (por defecto: `10`)
+
+#### 📘 Ejemplo de solicitud
+
+```bash
+curl "http://localhost:8080/api/history?page=1&size=10"
+```
+
 ## 🧭 Endpoints secundarios
 | Método | Endpoint                                     | Descripción                                 |
 |--------|----------------------------------------------|---------------------------------------------|
-| POST   | `/calculate?mockEnabled=true`                | Realiza suma con porcentaje estático de 10% añadido        |
+| POST   | `/sum?mockEnabled=true`                | Realiza suma con porcentaje estático de 10% añadido        |
 | GET    | `/history?page=1&size=10`                    | Devuelve historial de llamadas (paginado dinámco)   |
 
 ---
