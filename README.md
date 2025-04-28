@@ -35,13 +35,14 @@ Una API REST desarrollada en Java 21 usando Spring Boot, con cálculo dinámico,
 
 ## 🛠️ Tecnologías usadas
 
-- Java 21
-- Spring Boot
-- Spring Web, Spring Cache, Spring Data JPA
-- PostgreSQL
-- Docker & Docker Compose
-- JUnit 5 + Mockito
-- Swagger
+- Java 21  
+- Spring Boot  
+- Spring WebFlux, Spring Data JPA  
+- Redis (reactivo, usando Spring Data Redis Reactive)  
+- PostgreSQL  
+- Docker & Docker Compose  
+- JUnit 5 + Mockito  
+- Postman y Swagger
 
 ---
 
@@ -50,7 +51,7 @@ Una API REST desarrollada en Java 21 usando Spring Boot, con cálculo dinámico,
 ### 🔧 Requisitos previos
 
 - Docker y Docker Compose instalados
-- (Opcional) Java 21 y Maven si deseas correrlo sin contenedor
+- (Opcional) Java 21 y Gradle si deseas correrlo sin contenedor
 
 ---
 
@@ -94,7 +95,7 @@ La imagen está disponible en Docker Hub:
 
 ## 📚 Arquitectura del proyecto
 
-src ├── controller ├── service ├── repository ├── config ├── model └── util
+src ├── controller ├── service ├── repository ├── config ├── model └── util └── webclient └── advice
 
 yaml
 Copiar
@@ -111,7 +112,7 @@ Diseño basado en capas: separación de responsabilidades, código limpio y arqu
 - [x] PostgreSQL
 - [x] Registro asíncrono no bloqueante
 - [x] Docker + docker-compose
-- [x] Swagger y documentación con Postman
+- [x] Documentación con Postman y Swagger
 - [x] Tests unitarios con simulación de errores
 
 ---
