@@ -64,7 +64,7 @@ cd reto
 ```
 2. Levanta los servicios::
 ```bash
-docker-compose up --build -d
+docker-compose up -d
 ```
 3. Accede a la API:
 - 🧩 **API**: [http://localhost:8080](http://localhost:8080)
