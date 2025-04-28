@@ -38,7 +38,7 @@ public class ConsultServiceImpl implements ConsultService {
   private final SessionTemplateRepository sessionTemplateRepository;
 
   @Override
-  public Mono<ValuesResponse> calculateSum(ValuesRequest request, ServerWebExchange httpRequest) {
+  public Mono<ValuesResponse> calculateSum(ValuesRequest request, boolean mockEnabled ,ServerWebExchange httpRequest) {
     log.info("ingresando: {}",request);
     BigDecimal num1 = request.getNum1();
     BigDecimal num2 = request.getNum2();
@@ -63,12 +63,12 @@ public class ConsultServiceImpl implements ConsultService {
 
     UUID uuid = createUuidIdentifier(num1.toString(), num2.toString());
 
-    return handleNewSession(history, num1.toString(), num2.toString(), uuid);
+    return handleNewSession(mockEnabled, history, num1.toString(), num2.toString(), uuid);
   }
 
-  private Mono<ValuesResponse> handleNewSession(History history, String num1, String num2, UUID uuid) {
+  private Mono<ValuesResponse> handleNewSession(boolean mockEnabled, History history, String num1, String num2, UUID uuid) {
     BigDecimal originalAnswer = history.getAnswer();
-    return externalApiWebClient.getPercentage().flatMap(externalApiResponse -> {
+    return externalApiWebClient.getPercentage(mockEnabled).flatMap(externalApiResponse -> {
 
       BigDecimal percentage = externalApiResponse.getRandom();
 

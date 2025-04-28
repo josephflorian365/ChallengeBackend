@@ -13,6 +13,7 @@ import com.retoTenpo.reto.repository.HistoryRepository;
 import com.retoTenpo.reto.repository.SessionTemplateRepository;
 import com.retoTenpo.reto.repository.model.History;
 import com.retoTenpo.reto.repository.model.Session;
+import com.retoTenpo.reto.service.exception.SessionNotFoundException;
 import com.retoTenpo.reto.webclient.ExternalApiWebClient;
 import com.retoTenpo.reto.webclient.response.ExternalApiResponse;
 import java.math.BigDecimal;
@@ -50,7 +51,7 @@ class ConsultServiceImplTest {
 
   @Test
   void givenNum1Num2_whenCalculateSum_thenReturnAnswer() {
-    when(externalApiWebClient.getPercentage())
+    when(externalApiWebClient.getPercentage(any(Boolean.class)))
         .thenReturn(Mono.just(ExternalApiResponse.builder().random(BigDecimal.TEN).build()));
     when(sessionTemplateRepository.saveSesion(any(Session.class)))
         .thenReturn(Mono.just(Session.builder().build()));
@@ -64,7 +65,7 @@ class ConsultServiceImplTest {
     Mono<ValuesResponse> response = consultService.calculateSum(ValuesRequest.builder()
         .num1(BigDecimal.TEN)
         .num2(BigDecimal.TEN)
-        .build(), exchange);
+        .build(), Boolean.TRUE,exchange);
     StepVerifier.create(response)
         .expectNextMatches(valuesResponse -> {
           BigDecimal sum = BigDecimal.TEN.add(BigDecimal.TEN);
@@ -78,8 +79,8 @@ class ConsultServiceImplTest {
   }
 
   @Test
-  void givenNum1Num2_whenErrorGetPercentage_thenFindSesionByGuuidAndReturnAnswer() {
-    when(externalApiWebClient.getPercentage())
+  void givenNum1Num2_whenErrorGetPercentage_thenFindSessionByGuuidAndReturnAnswer() {
+    when(externalApiWebClient.getPercentage(any(Boolean.class)))
         .thenReturn(Mono.error(new RuntimeException("Simulated 500 error from external API")));
     when(sessionTemplateRepository.findSesionByGuuid(any(UUID.class)))
         .thenReturn(Mono.just(Session.builder().guuid(UUID.randomUUID()).percentage(BigDecimal.TEN).build()));
@@ -93,7 +94,7 @@ class ConsultServiceImplTest {
     Mono<ValuesResponse> response = consultService.calculateSum(ValuesRequest.builder()
         .num1(BigDecimal.TEN)
         .num2(BigDecimal.TEN)
-        .build(), exchange);
+        .build(), Boolean.TRUE, exchange);
     StepVerifier.create(response)
         .expectNextMatches(valuesResponse -> {
           BigDecimal sum = BigDecimal.TEN.add(BigDecimal.TEN);
@@ -103,6 +104,29 @@ class ConsultServiceImplTest {
           return true;
         })
         .expectComplete()
+        .verify();
+  }
+
+  @Test
+  void givenNum1Num2_whenErrorGetPercentage_thenFindSessionByGuuidAndReturnException() {
+    when(externalApiWebClient.getPercentage(any(Boolean.class)))
+        .thenReturn(Mono.error(new RuntimeException("Simulated 500 error from external API")));
+    when(sessionTemplateRepository.findSesionByGuuid(any(UUID.class)))
+        .thenReturn(Mono.just(Session.builder().build()));
+    ServerWebExchange exchange = mock(ServerWebExchange.class);
+    ServerHttpRequest request = mock(ServerHttpRequest.class);
+    URI mockUri = URI.create("/test-path");
+
+    when(exchange.getRequest()).thenReturn(request);
+    when(request.getMethod()).thenReturn(HttpMethod.POST);
+    when(request.getURI()).thenReturn(mockUri);
+    Mono<ValuesResponse> response = consultService.calculateSum(ValuesRequest.builder()
+        .num1(BigDecimal.TEN)
+        .num2(BigDecimal.TEN)
+        .build(), Boolean.TRUE, exchange);
+    // Act & Assert
+    StepVerifier.create(response)
+        .expectErrorMatches(throwable -> throwable instanceof SessionNotFoundException)
         .verify();
   }
 

@@ -26,14 +26,11 @@ public class ExternalApiWebClientImpl implements ExternalApiWebClient {
 
   private final CircuitBreakerRegistry circuitBreakerRegistry;
 
-  @Value("${mock.api.percentage.enabled}")
-  private boolean mockEnabled;
-
   @Value("${mock.api.percentage.value}")
   private BigDecimal mockValue;
 
   @Override
-  public Mono<ExternalApiResponse> getPercentage() {
+  public Mono<ExternalApiResponse> getPercentage(boolean mockEnabled) {
     if (mockEnabled) {
       return Mono.just(ExternalApiResponse.builder()
           .random(mockValue)

@@ -4,5 +4,5 @@ import com.retoTenpo.reto.webclient.response.ExternalApiResponse;
 import reactor.core.publisher.Mono;
 
 public interface ExternalApiWebClient {
-  Mono<ExternalApiResponse> getPercentage();
+  Mono<ExternalApiResponse> getPercentage(boolean mockValue);
 }

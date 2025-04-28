@@ -9,7 +9,7 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Mono;
 
 public interface ConsultService {
-  Mono<ValuesResponse> calculateSum(ValuesRequest request, ServerWebExchange httpRequest);
+  Mono<ValuesResponse> calculateSum(ValuesRequest request, boolean mockEnabled,ServerWebExchange httpRequest);
 
   Mono<PagedResponse<HistoryResponse>> getHistory(PageRequest pageRequest);
 }

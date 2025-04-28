@@ -30,8 +30,10 @@ public class RequestsController {
 
   @PostMapping("/sum")
   public Mono<ValuesResponse> calculateSum(
-      @RequestBody @Valid ValuesRequest request, ServerWebExchange httpRequest) {
-    return consultService.calculateSum(request, httpRequest);
+      @RequestBody @Valid ValuesRequest request,
+      @RequestParam(defaultValue = "true") boolean mockEnabled,
+      ServerWebExchange httpRequest) {
+    return consultService.calculateSum(request, mockEnabled,httpRequest);
   }
 
   @GetMapping("/history")
