@@ -61,7 +61,6 @@ Una API REST desarrollada en Java 21 usando Spring Boot, con cálculo dinámico,
 ```bash
 https://github.com/josephflorian365/ChallengeBackend.git
 cd challenge-backend
-cd reto
 ```
 2. Levanta los servicios::
 ```bash
@@ -77,6 +76,13 @@ docker-compose up -d
 |--------|--------------|---------------------------------------------|
 | POST    | `/calculate` | Realiza suma con porcentaje dinámico        |
 | GET    | `/history`   | Devuelve historial de llamadas (paginado)   |
+
+---
+## 🧭 Endpoints secundarios
+| Método | Endpoint                                     | Descripción                                 |
+|--------|----------------------------------------------|---------------------------------------------|
+| POST   | `/calculate?mockEnabled=true`                | Realiza suma con porcentaje estático de 10% añadido        |
+| GET    | `/history?page=1&size=10`                    | Devuelve historial de llamadas (paginado dinámco)   |
 
 ---
 
