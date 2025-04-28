@@ -19,6 +19,14 @@ public class RequestCachingFilter implements WebFilter {
   public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
     ServerHttpRequest request = exchange.getRequest();
 
+    // Evitar GET u otros métodos sin body
+    if (request.getMethod() == null ||
+        request.getMethod().matches("GET") ||
+        request.getHeaders().getContentLength() == 0 ||
+        request.getHeaders().getContentLength() == -1) {
+      return chain.filter(exchange);
+    }
+
     return DataBufferUtils.join(request.getBody())
         .flatMap(dataBuffer -> {
           byte[] bytes = new byte[dataBuffer.readableByteCount()];

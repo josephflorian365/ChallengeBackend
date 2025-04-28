@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.bind.support.WebExchangeBindException;
+import org.springframework.web.reactive.resource.NoResourceFoundException;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.ServerWebInputException;
 import reactor.core.publisher.Mono;
@@ -26,10 +27,10 @@ public class GlobalExceptionHandler {
 
   private final HistoryRepository historyRepository;
 
-  @ExceptionHandler(IllegalArgumentException.class)
-  public Mono<ResponseEntity<ErrorResponse>> handleBadRequest(IllegalArgumentException ex) {
-    ErrorResponse error = new ErrorResponse("BAD_REQUEST", ex.getMessage());
-    return Mono.just(ResponseEntity.status(HttpStatus.BAD_REQUEST).body(error));
+  @ExceptionHandler(NoResourceFoundException.class)
+  public Mono<ResponseEntity<ErrorResponse>> handleBadRequest(NoResourceFoundException ex) {
+    ErrorResponse error = new ErrorResponse("NOT_FOUND", ex.getMessage());
+    return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body(error));
   }
 
   @ExceptionHandler(Exception.class)
